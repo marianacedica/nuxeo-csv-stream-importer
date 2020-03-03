@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="org.nuxeo.importer.stream.csv.automation.contrib" version="1.0">
+
+  <extension target="org.nuxeo.ecm.core.operation.OperationServiceComponent" point="operations">
+    <operation class="org.nuxeo.ecm.platform.csv.importer.automation.CSVDocumentConsumers" />
+    <operation class="org.nuxeo.ecm.platform.csv.importer.automation.CSVDocumentProducer" />
+   
+  </extension>
+
+</component>
