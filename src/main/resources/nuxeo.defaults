@@ -1,0 +1,7 @@
+nuxeo.stream.import.default.partitions=3
+
+nuxeo.stream.import.batch.concurrency=3
+nuxeo.stream.import.batch.partitions=10
+
+nuxeo.stream.import.batch.threshold.ms=50
+

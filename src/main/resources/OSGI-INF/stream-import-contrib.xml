@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<component name="org.nuxeo.ecm.core.csv.import.config" version="1.0.0">
+
+    <!-- Configure the default scroller behavior -->
+    <!--
+    <extension target="org.nuxeo.runtime.ConfigurationService" point="configuration">
+        <property name="nuxeo.stream.import.default.partitions">3</property>
+    </extension>
+    -->
+
+    <require>org.nuxeo.runtime.stream.service</require>
+
+    <extension target="org.nuxeo.runtime.stream.service" point="logConfig">
+        <logConfig name="csv-stream-import-config">
+            <!-- size is the number of partitions in the log -->
+            <log name="csv-stream-import" size="${nuxeo.stream.import.default.partitions:=3}"/>
+        </logConfig>
+    </extension>
+
+    <extension target="org.nuxeo.runtime.stream.service" point="streamProcessor">
+        <streamProcessor name="csvStreamImportLogWriter" logConfig="csv-stream-import-config"
+                         defaultConcurrency="3" defaultPartitions="3"
+                         class="org.nuxeo.ecm.platform.csv.importer.processor.StreamDocumentProcessor">
+            <!-- retry policy -->
+            <policy name="CSVStreamImportWriter" batchCapacity="10"
+                    batchThreshold="${nuxeo.stream.import.batch.threshold.ms:=50}ms"
+                    maxRetries="3" delay="1s" maxDelay="60s" continueOnFailure="true"/>
+
+            <!-- stream partition -->
+            <stream name="CSVStreamImportWriter" partitions="${nuxeo.stream.import.batch.partitions:=10}"/>
+            <!-- concurrency configuration -->
+            <computation name="CSVStreamImportWriter" concurrency="${nuxeo.stream.import.batch.concurrency:=3}"/>
+        </streamProcessor>
+    </extension>
+
+</component>
