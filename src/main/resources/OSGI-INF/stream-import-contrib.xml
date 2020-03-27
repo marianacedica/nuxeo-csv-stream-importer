@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<component name="org.nuxeo.ecm.core.import.config" version="1.0.0">
+
+    <require>org.nuxeo.runtime.stream.service</require>
+
+    <extension target="org.nuxeo.runtime.stream.service" point="logConfig">
+        <logConfig name="${nuxeo.stream.import.log.config:=stream-import}" />
+    </extension>
+
+    <extension target="org.nuxeo.runtime.stream.service" point="streamProcessor">
+        <streamProcessor name="importLogWriter" logConfig="${nuxeo.stream.import.log.config:=stream-import}"
+                         defaultConcurrency="4" defaultPartitions="10" defaultCodec="${nuxeo.stream.import.log.codec:=avro}"
+                         class="org.nuxeo.ecm.platform.csv.importer.processor.StreamDocumentProcessor">
+            <policy name="ImportLogWriter" batchCapacity="${nuxeo.stream.import.batch.size:=10}"
+                    batchThreshold="${nuxeo.stream.import.batch.threshold.ms:=50}ms"
+                    maxRetries="3" delay="1s" maxDelay="60s" continueOnFailure="true" />
+        </streamProcessor>
+    </extension>
+
+    <!--
+    <extension target="org.nuxeo.runtime.stream.service" point="logConfig">
+        <logConfig name="${nuxeo.stream.audit.log.config:=audit}" />
+    </extension>
+
+    <extension target="org.nuxeo.runtime.stream.service" point="streamProcessor">
+        <streamProcessor name="auditLogWriter" logConfig="${nuxeo.stream.audit.log.config:=audit}"
+            defaultConcurrency="1" defaultPartitions="1" defaultCodec="${nuxeo.stream.audit.log.codec:=legacy}"
+            class="org.nuxeo.ecm.platform.audit.impl.StreamAuditWriter"
+            enabled="${nuxeo.stream.audit.enabled:=true}">
+            <policy name="AuditLogWriter" batchCapacity="${nuxeo.stream.audit.batch.size:=10}"
+                batchThreshold="${nuxeo.stream.audit.batch.threshold.ms:=50}ms"
+                maxRetries="20" delay="1s" maxDelay="60s" continueOnFailure="false" />
+        </streamProcessor>
+    </extension>
+  -->
+
+</component>

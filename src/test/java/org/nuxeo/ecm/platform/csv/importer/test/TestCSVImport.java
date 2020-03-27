@@ -18,13 +18,6 @@
  */
 package org.nuxeo.ecm.platform.csv.importer.test;
 
-import static org.junit.Assert.assertEquals;
-
-import java.io.File;
-import java.util.List;
-
-import javax.inject.Inject;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Rule;
@@ -33,19 +26,20 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.api.repository.RepositoryManager;
 import org.nuxeo.ecm.core.test.CoreFeature;
-import org.nuxeo.ecm.platform.csv.importer.consumer.CustomDocumentMessageConsumerFactory;
+import org.nuxeo.ecm.platform.csv.importer.message.MessageRecord;
 import org.nuxeo.ecm.platform.csv.importer.producer.CSVDocumentMessageProducerFactory;
-import org.nuxeo.importer.stream.message.DocumentMessage;
 import org.nuxeo.lib.stream.log.LogManager;
-import org.nuxeo.lib.stream.pattern.consumer.BatchPolicy;
-import org.nuxeo.lib.stream.pattern.consumer.ConsumerPolicy;
-import org.nuxeo.lib.stream.pattern.consumer.ConsumerPool;
-import org.nuxeo.lib.stream.pattern.consumer.ConsumerStatus;
 import org.nuxeo.lib.stream.pattern.producer.ProducerPool;
 import org.nuxeo.lib.stream.pattern.producer.ProducerStatus;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
+
+import javax.inject.Inject;
+import java.io.File;
+import java.util.List;
+
+import static org.junit.Assert.assertEquals;
 
 @RunWith(FeaturesRunner.class)
 @Features(CoreFeature.class)
@@ -73,23 +67,13 @@ public abstract class TestCSVImport {
         try (LogManager manager = getManager()) {
             manager.createIfNotExists("csv-import", 1);
 
-            try (ProducerPool<DocumentMessage> producers = new ProducerPool<DocumentMessage>("csv-import", manager,
+            try (ProducerPool<MessageRecord> producers = new ProducerPool<MessageRecord>("csv-import", manager,
                     new CSVDocumentMessageProducerFactory(getFile("sample-file.csv")),
                     nbThreadsProducers.shortValue())) {
                 List<ProducerStatus> ret = producers.start().get();
 
                 // assert nr of messages produced equals nr of documents in the csv file
                 assertEquals(13, ret.stream().mapToLong(r -> r.nbProcessed).sum());
-
-                try (LogManager managerBlobInfo = getManager()) {
-                    managerBlobInfo.createIfNotExists("csv-import", 1);
-                    ConsumerPool<DocumentMessage> consumers = new ConsumerPool<DocumentMessage>("csv-import", manager,
-                            new CustomDocumentMessageConsumerFactory(repositoryManager.getDefaultRepositoryName(), "/"),
-                            ConsumerPolicy.builder().batchPolicy(BatchPolicy.NO_BATCH).build());
-                    List<ConsumerStatus> retConsumers = consumers.start().get();
-                    // we only have one consumer and 13 messages as we need to create also the folders before
-                    assertEquals(13, retConsumers.stream().mapToLong(r -> r.committed).sum());
-                }
             }
         }
     }

@@ -18,13 +18,6 @@
  */
 package org.nuxeo.ecm.platform.csv.importer.test;
 
-import static org.junit.Assert.assertEquals;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.inject.Inject;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -33,12 +26,17 @@ import org.nuxeo.ecm.automation.AutomationService;
 import org.nuxeo.ecm.automation.OperationContext;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.test.CoreFeature;
-import org.nuxeo.ecm.platform.csv.importer.automation.CSVDocumentConsumers;
 import org.nuxeo.ecm.platform.csv.importer.automation.CSVDocumentProducer;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 import org.nuxeo.runtime.transaction.TransactionHelper;
+
+import javax.inject.Inject;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
 
 @RunWith(FeaturesRunner.class)
 @Features(CoreFeature.class)
@@ -73,16 +71,6 @@ public abstract class TestAutomation {
         automationService.run(ctx, CSVDocumentProducer.ID, params);
 
         // 2. import document into the repository
-        params.clear();
-        params.put("rootFolder", "/");
-        params.put("useBulkMode", true);
-        params.put("blockDefaultSyncListeners", true);
-        params.put("blockPostCommitListeners", true);
-        params.put("blockAsyncListeners", true);
-        params.put("blockIndexing", true);
-        params.put("logName", "csv-import");
-        addExtraParams(params);
-        automationService.run(ctx, CSVDocumentConsumers.ID, params);
 
         // WorkManager service = Framework.getService(WorkManager.class);
         // assertTrue(service.awaitCompletion(10, TimeUnit.SECONDS));

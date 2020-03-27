@@ -1,7 +1,16 @@
 package org.nuxeo.ecm.platform.csv.importer.producer;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.nuxeo.ecm.core.io.registry.MarshallerHelper;
+import org.nuxeo.ecm.core.io.registry.context.RenderingContext;
+import org.nuxeo.ecm.platform.csv.importer.message.MessageRecord;
+import org.nuxeo.importer.stream.message.DocumentMessage;
+import org.nuxeo.lib.stream.pattern.producer.AbstractProducer;
+
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -10,14 +19,10 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Stream;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.nuxeo.importer.stream.message.DocumentMessage;
-import org.nuxeo.importer.stream.producer.FileBlobMessageProducer;
-import org.nuxeo.lib.stream.pattern.producer.AbstractProducer;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class CSVDocumentMessageProducer extends AbstractProducer<DocumentMessage> {
-    private static final Log log = LogFactory.getLog(FileBlobMessageProducer.class);
+public class CSVDocumentMessageProducer extends AbstractProducer<MessageRecord> {
+    private static final Log log = LogFactory.getLog(CSVDocumentMessageProducer.class);
 
     private static final String DEFAULT_SEPARATOR = ",";
 
@@ -38,7 +43,7 @@ public class CSVDocumentMessageProducer extends AbstractProducer<DocumentMessage
     }
 
     @Override
-    public int getPartition(DocumentMessage message, int partitions) {
+    public int getPartition(MessageRecord message, int partitions) {
         // this has to be changed
         // You can use map key value where key is the parent path and value is the partition key
         // using message.getParentPath()
@@ -54,9 +59,11 @@ public class CSVDocumentMessageProducer extends AbstractProducer<DocumentMessage
     }
 
     @Override
-    public DocumentMessage next() {
+    public MessageRecord next() {
         String[] columns = scanner.nextLine().split(DEFAULT_SEPARATOR);
-        return createDocument(columns);
+        DocumentMessage dc = createDocument(columns);
+        // Create a Record
+        return MessageRecord.of(dc.getId(), asJson(dc).getBytes(UTF_8));
     }
 
     protected HashMap<String, Serializable> parseProperties(String[] col) {
@@ -102,4 +109,17 @@ public class CSVDocumentMessageProducer extends AbstractProducer<DocumentMessage
         return builder.build();
     }
 
+
+    protected String asJson(DocumentMessage entry) {
+        if (entry == null) {
+            return null;
+        }
+        RenderingContext ctx = RenderingContext.CtxBuilder.get();
+        try {
+            return MarshallerHelper.objectToJson(entry, ctx);
+        } catch (IOException e) {
+            log.warn("Unable to translate entry into json, entry:" + entry.getId() + ": " + e.getMessage(), e);
+            return null;
+        }
+    }
 }

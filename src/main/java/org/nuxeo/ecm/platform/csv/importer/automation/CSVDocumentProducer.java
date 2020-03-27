@@ -1,10 +1,5 @@
 package org.nuxeo.ecm.platform.csv.importer.automation;
 
-import static org.nuxeo.importer.stream.automation.BlobConsumers.DEFAULT_LOG_CONFIG;
-
-import java.io.File;
-import java.util.concurrent.ExecutionException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.automation.OperationContext;
@@ -16,13 +11,18 @@ import org.nuxeo.ecm.automation.core.annotations.OperationMethod;
 import org.nuxeo.ecm.automation.core.annotations.Param;
 import org.nuxeo.ecm.core.api.NuxeoException;
 import org.nuxeo.ecm.core.api.NuxeoPrincipal;
+import org.nuxeo.ecm.platform.csv.importer.message.MessageRecord;
 import org.nuxeo.ecm.platform.csv.importer.producer.CSVDocumentMessageProducerFactory;
 import org.nuxeo.importer.stream.automation.RandomBlobProducers;
-import org.nuxeo.importer.stream.message.DocumentMessage;
 import org.nuxeo.lib.stream.log.LogManager;
 import org.nuxeo.lib.stream.pattern.producer.ProducerPool;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.stream.StreamService;
+
+import java.io.File;
+import java.util.concurrent.ExecutionException;
+
+import static org.nuxeo.importer.stream.automation.BlobConsumers.DEFAULT_LOG_CONFIG;
 
 @Operation(id = CSVDocumentProducer.ID, category = Constants.CAT_SERVICES, label = "Reads a CSV File and produces docs messages", description = "")
 public class CSVDocumentProducer {
@@ -70,7 +70,7 @@ public class CSVDocumentProducer {
             // producers/
             // one per file
 
-            try (ProducerPool<DocumentMessage> producers = new ProducerPool<DocumentMessage>(getLogName(), manager,
+            try (ProducerPool<MessageRecord> producers = new ProducerPool<>(getLogName(), manager,
                     new CSVDocumentMessageProducerFactory(csvFile), nbThreads.shortValue())) {
                 producers.start().get();
             }
