@@ -21,25 +21,16 @@ package org.nuxeo.ecm.platform.csv.importer.test;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Rule;
-import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.nuxeo.ecm.core.api.repository.RepositoryManager;
 import org.nuxeo.ecm.core.test.CoreFeature;
-import org.nuxeo.ecm.platform.csv.importer.message.MessageRecord;
-import org.nuxeo.ecm.platform.csv.importer.producer.CSVDocumentMessageProducerFactory;
 import org.nuxeo.lib.stream.log.LogManager;
-import org.nuxeo.lib.stream.pattern.producer.ProducerPool;
-import org.nuxeo.lib.stream.pattern.producer.ProducerStatus;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 
 import javax.inject.Inject;
-import java.io.File;
-import java.util.List;
-
-import static org.junit.Assert.assertEquals;
 
 @RunWith(FeaturesRunner.class)
 @Features(CoreFeature.class)
@@ -61,6 +52,8 @@ public abstract class TestCSVImport {
     @Inject
     RepositoryManager repositoryManager;
 
+
+    /*
     @Test
     public void fileCSVImporterImporter() throws Exception {
 
@@ -85,5 +78,5 @@ public abstract class TestCSVImport {
     protected String getBasePathList(String base) {
         return this.getClass().getClassLoader().getResource(base).getPath();
     }
-
+*/
 }

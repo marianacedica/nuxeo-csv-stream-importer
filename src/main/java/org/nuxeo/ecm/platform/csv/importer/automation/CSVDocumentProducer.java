@@ -11,99 +11,59 @@ import org.nuxeo.ecm.automation.core.annotations.OperationMethod;
 import org.nuxeo.ecm.automation.core.annotations.Param;
 import org.nuxeo.ecm.core.api.NuxeoException;
 import org.nuxeo.ecm.core.api.NuxeoPrincipal;
-import org.nuxeo.ecm.platform.csv.importer.message.MessageRecord;
-import org.nuxeo.ecm.platform.csv.importer.producer.CSVDocumentMessageProducerFactory;
-import org.nuxeo.importer.stream.automation.RandomBlobProducers;
+import org.nuxeo.lib.stream.computation.Record;
+import org.nuxeo.lib.stream.log.LogAppender;
 import org.nuxeo.lib.stream.log.LogManager;
-import org.nuxeo.lib.stream.pattern.producer.ProducerPool;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.stream.StreamService;
 
 import java.io.File;
-import java.util.concurrent.ExecutionException;
+import java.nio.charset.Charset;
+import java.util.stream.IntStream;
 
-import static org.nuxeo.importer.stream.automation.BlobConsumers.DEFAULT_LOG_CONFIG;
+import static org.nuxeo.ecm.platform.csv.importer.ImporterConstants.*;
 
 @Operation(id = CSVDocumentProducer.ID, category = Constants.CAT_SERVICES, label = "Reads a CSV File and produces docs messages", description = "")
 public class CSVDocumentProducer {
-    private static final Log log = LogFactory.getLog(RandomBlobProducers.class);
+    private static final Log log = LogFactory.getLog(CSVDocumentProducer.class);
 
     public static final String ID = "StreamImporter.CSVDocumentProducer";
 
-    public static final String DEFAULT_BLOB_LOG_NAME = "import-blob";
+    // First partition is ZERO
+    private static final int FIRST_PARTITION = 0;
 
     @Context
     protected OperationContext ctx;
 
-    @Param(name = "logName", required = false)
-    protected String logName;
-
-    @Param(name = "logSize", required = false)
-    protected Integer logSize;
-
-    @Param(name = "logConfig", required = false)
-    protected String logConfig;
 
     @Param(name = "csvFilePath")
     protected String csvFilePath;
-
-    @Param(name = "nbThreads", required = false)
-    protected Integer nbThreads = 1;
 
     @OperationMethod
     public void run() throws OperationException {
         checkAccess(ctx);
         StreamService service = Framework.getService(StreamService.class);
-        LogManager manager = service.getLogManager(getLogConfig());
-        manager.createIfNotExists(getLogName(), getLogSize());
-
+        LogManager manager = service.getLogManager(CSV_STREAM_IMPORT_CONFIG);
+        log.error("csvFilePath: " + csvFilePath);
         File csvFile = new File(csvFilePath);
         if (!csvFile.exists()) {
             throw new NuxeoException("CSV file does not exist");
         }
-        try {
-            manager.createIfNotExists(getLogName(), getLogSize());
-            // no point in having multiple producers per file since its not more performat to read one file with
-            // multiple
-            // threads
-            // will change this here if we pass a folder path containing multiple files and we can have a pool of
-            // producers/
-            // one per file
 
-            try (ProducerPool<MessageRecord> producers = new ProducerPool<>(getLogName(), manager,
-                    new CSVDocumentMessageProducerFactory(csvFile), nbThreads.shortValue())) {
-                producers.start().get();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("Operation interrupted");
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
-            log.error("Operation fails", e);
-            throw new OperationException(e);
-        }
-    }
+        byte[] data = "value007".getBytes(Charset.defaultCharset());
+        LogAppender<Record> appender = manager.getAppender(STREAM_NAME);
 
-    protected String getLogConfig() {
-        if (logConfig != null) {
-            return logConfig;
-        }
-        return DEFAULT_LOG_CONFIG;
-    }
+        log.error("Number of partitions: " + getLogSize());
+        //TODO: Should loop over the csv lines and create a Record that contain each document + round robin to spread the load
+        IntStream.range(1, 20).forEach(x -> {
+                    appender.append(FIRST_PARTITION, Record.of(csvFilePath + x, data));
+                }
+        );
 
-    protected String getLogName() {
-        if (logName != null) {
-            return logName;
-        }
-        return DEFAULT_BLOB_LOG_NAME;
     }
 
     protected int getLogSize() {
-        if (logSize != null && logSize > 0) {
-            return logSize;
-        }
-        // return nbThreads;
-        return 1;
+        return Integer.parseInt(Framework.getProperty(KEY_PARTITION_NUMBER, PARTITION_NUMBER_DEF_VALUE));
     }
 
     protected static void checkAccess(OperationContext context) {

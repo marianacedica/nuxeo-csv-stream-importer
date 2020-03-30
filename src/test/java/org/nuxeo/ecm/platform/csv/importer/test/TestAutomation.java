@@ -18,6 +18,7 @@
  */
 package org.nuxeo.ecm.platform.csv.importer.test;
 
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -27,6 +28,7 @@ import org.nuxeo.ecm.automation.OperationContext;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.test.CoreFeature;
 import org.nuxeo.ecm.platform.csv.importer.automation.CSVDocumentProducer;
+import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
@@ -40,12 +42,14 @@ import static org.junit.Assert.assertEquals;
 
 @RunWith(FeaturesRunner.class)
 @Features(CoreFeature.class)
-@Deploy("org.nuxeo.runtime.stream")
-@Deploy("org.nuxeo.importer.stream")
-@Deploy("org.nuxeo.ecm.automation.core")
-@Deploy("org.nuxeo.importer.stream.csv")
-@Deploy("org.nuxeo.importer.stream.csv:test-stream-contrib.xml")
-@Deploy("org.nuxeo.ecm.core.io")
+@Deploy({
+        "org.nuxeo.runtime.stream",
+        "org.nuxeo.importer.stream",
+        "org.nuxeo.ecm.automation.core",
+        "org.nuxeo.importer.stream.csv",
+        "org.nuxeo.importer.stream.csv:test-stream-contrib.xml",
+        "org.nuxeo.ecm.core.io"
+})
 public abstract class TestAutomation {
 
     @Inject
@@ -54,30 +58,41 @@ public abstract class TestAutomation {
     @Inject
     AutomationService automationService;
 
+    @Inject
+    protected CoreFeature coreFeature;
+
     @Rule
     public TemporaryFolder folder = new TemporaryFolder();
 
     public abstract void addExtraParams(Map<String, Object> params);
+
+    @Before
+    public void init() {
+        Framework.getProperties().put("nuxeo.stream.import.batch.threshold.ms", "50ms");
+        Framework.getProperties().put("nuxeo.stream.import.default.partitions", "4");
+        Framework.getProperties().put("nuxeo.stream.import.batch.partitions", "12");
+        Framework.getProperties().put("nuxeo.stream.import.batch.concurrency", "4");
+    }
 
     @Test
     public void testCSVImport() throws Exception {
 
         // 1 . produce messages
         OperationContext ctx = new OperationContext(session);
-        Map<String, Object> params = new HashMap<>();
-        params.put("csvFilePath", getFilepath("sample-file.csv"));
-        params.put("logName", "csv-import");
+        Map<String, Object> params = new HashMap<String, Object>() {{
+            put("csvFilePath", getFilepath("sample-file.csv"));
+        }};
         addExtraParams(params);
         automationService.run(ctx, CSVDocumentProducer.ID, params);
 
         // 2. import document into the repository
 
-        // WorkManager service = Framework.getService(WorkManager.class);
-        // assertTrue(service.awaitCompletion(10, TimeUnit.SECONDS));
-
+        coreFeature.waitForAsyncCompletion();
+        Thread.sleep(10000);
         // start a new transaction to prevent db isolation to hide our new documents
         TransactionHelper.commitOrRollbackTransaction();
         TransactionHelper.startTransaction();
+
 
         int createdDocuments = session.query("SELECT * FROM Document WHERE ecm:primaryType IN ('File')").size();
         assertEquals(5, createdDocuments);
