@@ -1,10 +1,5 @@
 package org.nuxeo.ecm.platform.csv.importer.automation;
 
-import static org.nuxeo.importer.stream.automation.BlobConsumers.DEFAULT_LOG_CONFIG;
-
-import java.io.File;
-import java.util.concurrent.ExecutionException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.nuxeo.ecm.automation.OperationContext;
@@ -16,100 +11,131 @@ import org.nuxeo.ecm.automation.core.annotations.OperationMethod;
 import org.nuxeo.ecm.automation.core.annotations.Param;
 import org.nuxeo.ecm.core.api.NuxeoException;
 import org.nuxeo.ecm.core.api.NuxeoPrincipal;
-import org.nuxeo.ecm.platform.csv.importer.producer.CSVDocumentMessageProducerFactory;
-import org.nuxeo.importer.stream.automation.RandomBlobProducers;
-import org.nuxeo.importer.stream.message.DocumentMessage;
+import org.nuxeo.ecm.platform.csv.importer.transformer.LineToRecord;
+import org.nuxeo.ecm.platform.csv.importer.transformer.bean.LineBean;
+import org.nuxeo.lib.stream.computation.Record;
+import org.nuxeo.lib.stream.log.LogAppender;
 import org.nuxeo.lib.stream.log.LogManager;
-import org.nuxeo.lib.stream.pattern.producer.ProducerPool;
 import org.nuxeo.runtime.api.Framework;
 import org.nuxeo.runtime.stream.StreamService;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
+import java.util.function.Function;
+
+import static org.nuxeo.ecm.platform.csv.importer.ImporterConstants.*;
+
 @Operation(id = CSVDocumentProducer.ID, category = Constants.CAT_SERVICES, label = "Reads a CSV File and produces docs messages", description = "")
 public class CSVDocumentProducer {
-    private static final Log log = LogFactory.getLog(RandomBlobProducers.class);
+    private static final Log log = LogFactory.getLog(CSVDocumentProducer.class);
 
     public static final String ID = "StreamImporter.CSVDocumentProducer";
 
-    public static final String DEFAULT_BLOB_LOG_NAME = "import-blob";
+    // First partition is ZERO
+    private static final int FIRST_PARTITION = 0;
+
+    private static final String DEFAULT_SEPARATOR = ",";
+    public static final String CSV_FILE_PATH = "csvFilePath";
+    public static final String FUID = "fuid";
+    public static final String FORCE_SINGLE_CONSUMER_PRODUCER = "forceSingleConsumerProducer";
+
+    private static Long nbPartitions;
 
     @Context
     protected OperationContext ctx;
 
-    @Param(name = "logName", required = false)
-    protected String logName;
+    @Param(name = FUID, required = false)
+    protected String fuid;
 
-    @Param(name = "logSize", required = false)
-    protected Integer logSize;
-
-    @Param(name = "logConfig", required = false)
-    protected String logConfig;
-
-    @Param(name = "csvFilePath")
+    @Param(name = CSV_FILE_PATH, required = false)
     protected String csvFilePath;
 
-    @Param(name = "nbThreads", required = false)
-    protected Integer nbThreads = 1;
+    @Param(name = FORCE_SINGLE_CONSUMER_PRODUCER, required = false)
+    protected Boolean forceSingleConsumerProducer = Boolean.FALSE;
 
     @OperationMethod
-    public void run() throws OperationException {
-        checkAccess(ctx);
-        StreamService service = Framework.getService(StreamService.class);
-        LogManager manager = service.getLogManager(getLogConfig());
-        manager.createIfNotExists(getLogName(), getLogSize());
+    public void run() throws OperationException, FileNotFoundException {
 
+        checkAccess(ctx);
+
+        StreamService service = Framework.getService(StreamService.class);
+        LogManager manager = service.getLogManager(CSV_STREAM_IMPORT_CONFIG);
+        LogAppender<Record> appender = manager.getAppender(STREAM_NAME);
+
+        if (csvFilePath == null && fuid == null) {
+            throw new NuxeoException("Operation not initialized properly, specify either the 'fuid' or 'csvFilePath' parameter.");
+        }
+
+        if (fuid != null) {
+            if (craftCSVFilePath() == null) {
+                throw new NuxeoException("The nuxeo.conf property: " + NUXEO_STREAM_IMPORT_PATH_ROOT + " is not defined.");
+            }
+            csvFilePath = craftCSVFilePath() + "/" + fuid + "/" + fuid + ".csv";
+        }
+
+        log.info("CSV File Path: " + csvFilePath);
         File csvFile = new File(csvFilePath);
         if (!csvFile.exists()) {
             throw new NuxeoException("CSV file does not exist");
         }
-        try {
-            manager.createIfNotExists(getLogName(), getLogSize());
-            // no point in having multiple producers per file since its not more performat to read one file with
-            // multiple
-            // threads
-            // will change this here if we pass a folder path containing multiple files and we can have a pool of
-            // producers/
-            // one per file
 
-            try (ProducerPool<DocumentMessage> producers = new ProducerPool<DocumentMessage>(getLogName(), manager,
-                    new CSVDocumentMessageProducerFactory(csvFile), nbThreads.shortValue())) {
-                producers.start().get();
+        // Extract header
+        List<String> columnsHeaders = new ArrayList<>();
+        Scanner scanner = new Scanner(csvFile);
+        if (scanner.hasNext()) {
+            // header line
+            columnsHeaders = Arrays.asList(scanner.nextLine().split(DEFAULT_SEPARATOR));
+            log.debug("CSV Header: " + columnsHeaders);
+        }
+
+        // Round robin repartition
+        Long roundRobinCounter = 0L;
+        while (scanner.hasNext()) {
+
+            final Long currentPartition = roundRobinCounter % getLogSize();
+
+            List<String> columns = Arrays.asList(scanner.nextLine().split(DEFAULT_SEPARATOR));
+
+            log.debug("CSV Line [" + roundRobinCounter + "] columns values:" + columns);
+            final LineBean lineBean = new LineBean(columnsHeaders, columns, roundRobinCounter, csvFilePath);
+
+            // Force only one partition to manage folder creation first. Structure needs to be sorted by path
+            if (forceSingleConsumerProducer) {
+                log.debug("Forced single partition / Allocate message [" + lineBean + "] to partition [" + FIRST_PARTITION + "] of [" + getLogSize() + "]");
+                appender.append(FIRST_PARTITION, transformToRecord().apply(lineBean));
+            } else {
+                log.debug("Allocate message [" + lineBean + "] to partition [" + currentPartition + "] of [" + getLogSize() + "]");
+                appender.append(currentPartition.intValue(), transformToRecord().apply(lineBean));
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("Operation interrupted");
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
-            log.error("Operation fails", e);
-            throw new OperationException(e);
+            roundRobinCounter++;
         }
     }
 
-    protected String getLogConfig() {
-        if (logConfig != null) {
-            return logConfig;
+    protected Long getLogSize() {
+        if (nbPartitions == null) {
+            nbPartitions = Long.parseLong(Framework.getProperty(NUXEO_STREAM_IMPORT_DEFAULT_PARTITIONS, PARTITION_NUMBER_DEF_VALUE));
         }
-        return DEFAULT_LOG_CONFIG;
+        return nbPartitions;
     }
 
-    protected String getLogName() {
-        if (logName != null) {
-            return logName;
-        }
-        return DEFAULT_BLOB_LOG_NAME;
+
+    protected String craftCSVFilePath() {
+        return Framework.getProperty(NUXEO_STREAM_IMPORT_PATH_ROOT);
     }
 
-    protected int getLogSize() {
-        if (logSize != null && logSize > 0) {
-            return logSize;
-        }
-        // return nbThreads;
-        return 1;
-    }
 
     protected static void checkAccess(OperationContext context) {
         NuxeoPrincipal principal = context.getPrincipal();
         if (principal == null || !principal.isAdministrator()) {
             throw new RuntimeException("Unauthorized access: " + principal);
         }
+    }
+
+    Function<LineBean, Record> transformToRecord() {
+        return Framework.getService(LineToRecord.class).transform();
     }
 }

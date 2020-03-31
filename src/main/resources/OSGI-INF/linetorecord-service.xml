@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<component name="org.nuxeo.ecm.platform.csv.importer.transformer.LineToRecord" version="1.0">
+
+    <implementation class="org.nuxeo.ecm.platform.csv.importer.transformer.LineToRecordImpl"/>
+
+    <service>
+        <provide interface="org.nuxeo.ecm.platform.csv.importer.transformer.LineToRecord"/>
+    </service>
+</component>
