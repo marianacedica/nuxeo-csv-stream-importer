@@ -2,10 +2,11 @@
 <component name="org.nuxeo.ecm.core.csv.import.config" version="1.0.0">
 
     <!-- Configure the default scroller behavior -->
+    <!--
     <extension target="org.nuxeo.runtime.ConfigurationService" point="configuration">
         <property name="nuxeo.stream.import.default.partitions">3</property>
     </extension>
-
+    -->
 
     <require>org.nuxeo.runtime.stream.service</require>
 
