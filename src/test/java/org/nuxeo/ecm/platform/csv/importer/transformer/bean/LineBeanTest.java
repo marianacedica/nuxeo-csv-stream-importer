@@ -29,10 +29,7 @@ public class LineBeanTest {
     final List<String> VALUES_WITH_MINIMUM = Arrays.asList(
             /*"id",*/                       "123",
             /*"type",*/                     "File",
-            /*"dc:title",*/                 "A Title",
-            /*"CurrentVersion",*/           "",
-            /*"FoldersFiledIn",*/           "/Folder-Name",
-            /*"dc:created",*/               "2007-06-25T17:13:05");
+            /*"dc:title",*/                 "A Title");
 
     @Test
     public void testHasValidDataEmptyHeaderAndColumns() {
@@ -72,6 +69,17 @@ public class LineBeanTest {
 
         // GIVEN
         LineBean lineBean = new LineBean(Arrays.asList("a", "b"), VALUES, 1L, "path");
+        // WHEN
+        boolean result = lineBean.hasValidData();
+        // THEN
+        Assertions.assertThat(result).isFalse();
+    }
+
+    @Test
+    public void testHasValidDataHeaderAndColumnsLessColumnsAndHeadersThanExpected() {
+
+        // GIVEN
+        LineBean lineBean = new LineBean(Arrays.asList("a", "b"), Arrays.asList("y", "z"), 1L, "path");
         // WHEN
         boolean result = lineBean.hasValidData();
         // THEN
