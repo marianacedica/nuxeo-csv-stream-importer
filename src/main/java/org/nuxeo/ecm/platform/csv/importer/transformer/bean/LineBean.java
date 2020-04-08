@@ -38,9 +38,9 @@ public class LineBean {
                 // Column need to be greater than 5 to make sure we capture everything
                 this.columns != null &&
                 !this.columns.isEmpty() &&
-                this.columns.size() > 5 &&
-                // Size of both header and columns has to be equal
-                this.columns.size() == this.headers.size() &&
+                this.columns.size() > 2 &&
+                // Size of header greater or equal to columns values
+                this.headers.size() >= this.columns.size() &&
                 this.lineNumber != null &&
                 this.csvPath != null;
     }
